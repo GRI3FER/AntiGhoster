@@ -1,0 +1,21 @@
+# Environment & secrets
+.env
+
+# Settings (contains your personal contact data)
+settings.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+env/
+.venv/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
