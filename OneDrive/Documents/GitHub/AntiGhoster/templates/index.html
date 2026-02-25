@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AntiGhoster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0c0c0e;--surface:#131316;--surface2:#18181d;
+      --border:#1e1e24;--border-light:#2a2a33;
+      --text:#e8e8f0;--text2:#6b6b7e;--text3:#3a3a48;
+      --accent:#c8a97e;--accent-dim:rgba(200,169,126,.12);--accent-border:rgba(200,169,126,.3);
+      --green:#4ade80;--blue:#60a5fa;--yellow:#facc15;
+      --orange:#fb923c;--red:#f87171;--purple:#a78bfa;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:300;min-height:100vh}
+
+    /* ── SETUP ── */
+    #setup{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;padding:48px 24px;overflow-y:auto}
+    #setup.hidden{display:none}
+    .wizard{width:100%;max-width:640px;overflow:visible}
+
+    .steps{display:flex;align-items:center;margin-bottom:52px}
+    .step-dot{width:26px;height:26px;border-radius:50%;border:1px solid var(--border-light);background:var(--surface);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--text2);flex-shrink:0;transition:all .3s}
+    .step-dot.active{border-color:var(--accent-border);background:var(--accent-dim);color:var(--accent)}
+    .step-dot.done{border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.1);color:var(--green)}
+    .step-line{flex:1;height:1px;background:var(--border)}
+
+    .wstep{display:none;animation:fadeUp .25s ease both}
+    .wstep.active{display:block}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+    .wstep h2{font-family:'DM Serif Display',serif;font-size:1.85rem;font-weight:400;font-style:italic;line-height:1.15;margin-bottom:8px}
+    .wstep > p{color:var(--text2);font-size:.85rem;line-height:1.7;margin-bottom:28px}
+
+    /* People builder */
+    .people-list{display:flex;flex-direction:column;gap:12px;margin-bottom:16px;overflow:visible}
+
+    .person-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:visible;transition:border-color .2s}
+    .person-card.has-chats{border-color:var(--border-light)}
+
+    .person-header{display:flex;align-items:center;gap:10px;padding:12px 14px}
+    .person-num{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--text3);width:14px;flex-shrink:0;text-align:right}
+    .person-name-input{flex:1;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:500;outline:none;min-width:0}
+    .person-name-input::placeholder{color:var(--text3);font-weight:300}
+    .person-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:.9rem;padding:4px 6px;transition:color .15s;flex-shrink:0}
+    .person-del:hover{color:var(--red)}
+
+    /* Linked chats under each person */
+    .person-chats{padding:0 14px 12px 38px;display:flex;flex-wrap:wrap;gap:6px}
+    .chat-chip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;background:var(--surface2);border:1px solid var(--border-light);border-radius:20px;font-size:.75rem;cursor:default}
+    .chat-chip-av{width:20px;height:20px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:.55rem;color:var(--text2);overflow:hidden;flex-shrink:0}
+    .chat-chip-av img{width:100%;height:100%;object-fit:cover}
+    .chat-chip-name{color:var(--text);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .chat-chip-net{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--text2)}
+    .chat-chip-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:.8rem;padding:0 0 0 4px;line-height:1;transition:color .15s}
+    .chat-chip-x:hover{color:var(--red)}
+
+    /* Link search (inside person card) */
+    .person-link-row{padding:0 14px 12px 38px}
+    .link-search-wrap{position:relative}
+    .link-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.8rem;padding:8px 12px;outline:none;transition:border-color .2s}
+    .link-search:focus{border-color:var(--border-light)}
+    .link-search::placeholder{color:var(--text3)}
+    .link-results{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface2);border:1px solid var(--border-light);border-radius:10px;z-index:20;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+    .link-results.hidden{display:none}
+    .link-results::-webkit-scrollbar{width:3px}
+    .link-results::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
+    .link-result-item{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;transition:background .12s}
+    .link-result-item:hover{background:var(--surface)}
+    .link-result-av{width:26px;height:26px;border-radius:50%;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:.65rem;color:var(--text2);overflow:hidden}
+    .link-result-av img{width:100%;height:100%;object-fit:cover}
+    .link-result-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+    .link-result-name{font-size:.82rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .link-result-net{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--text2)}
+    .link-result-days{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--text3);flex-shrink:0}
+
+    /* Add more button */
+    .add-person-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;border:1px dashed var(--border-light);border-radius:10px;background:transparent;color:var(--text2);font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;cursor:pointer;transition:all .15s;margin-bottom:28px}
+    .add-person-btn:hover{border-color:var(--accent-border);color:var(--accent)}
+
+    /* Step 2 — groups */
+    .groups-list{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;margin-bottom:28px}
+    .group-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+    .group-row-info{flex:1;min-width:0}
+    .group-row-name{font-size:.875rem;font-weight:500}
+    .group-row-meta{font-family:'DM Mono',monospace;font-size:.63rem;color:var(--text2);margin-top:2px}
+    .toggle{position:relative;width:38px;height:20px;flex-shrink:0}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle-track{position:absolute;inset:0;background:var(--border-light);border-radius:10px;cursor:pointer;transition:background .2s}
+    .toggle-track::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+    .toggle input:checked+.toggle-track{background:var(--green)}
+    .toggle input:checked+.toggle-track::after{transform:translateX(18px)}
+
+    /* Nav */
+    .wizard-nav{display:flex;align-items:center;justify-content:space-between}
+    .btn{font-family:'DM Mono',monospace;font-size:.73rem;letter-spacing:.05em;padding:10px 22px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s}
+    .btn:hover{border-color:var(--border-light);color:var(--text)}
+    .btn-primary{background:var(--accent-dim);border-color:var(--accent-border);color:var(--accent)}
+    .btn-primary:hover{background:rgba(200,169,126,.2);border-color:var(--accent)}
+    .btn-ghost{border-color:transparent;color:var(--text2)}
+    .btn-ghost:hover{color:var(--text);border-color:transparent}
+    .done-icon{font-size:3rem;text-align:center;margin-bottom:20px}
+
+    /* ── APP ── */
+    #app{display:none}
+    #app.visible{display:block}
+
+    header{padding:32px 52px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+    .header-left h1{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,3vw,2.4rem);font-weight:400;font-style:italic;line-height:1;letter-spacing:-.02em}
+    .header-left p{margin-top:6px;font-size:.72rem;color:var(--text2);font-family:'DM Mono',monospace;letter-spacing:.07em;text-transform:uppercase}
+    .header-right{display:flex;align-items:center;gap:10px}
+    .status-pill{display:flex;align-items:center;gap:7px;font-family:'DM Mono',monospace;font-size:.67rem;color:var(--text2);letter-spacing:.04em;padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:100px;transition:border-color .3s}
+    .status-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);transition:background .3s}
+    .status-pill.connected{border-color:rgba(74,222,128,.3)}
+    .status-pill.connected .status-dot{background:var(--green);box-shadow:0 0 5px var(--green)}
+    .status-pill.error .status-dot{background:var(--red)}
+    .icon-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+    .icon-btn:hover{border-color:var(--border-light);color:var(--text)}
+
+    .toolbar{padding:16px 52px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+    .search-wrap{position:relative;flex:1;max-width:300px}
+    .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.3}
+    input[type=text]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.83rem;font-weight:300;padding:9px 12px 9px 34px;outline:none;transition:border-color .2s}
+    input[type=text]::placeholder{color:var(--text3)}
+    input[type=text]:focus{border-color:var(--border-light)}
+    .refresh-btn{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.05em;padding:8px 16px;border-radius:8px;border:1px solid var(--accent-border);background:var(--accent-dim);color:var(--accent);cursor:pointer;transition:all .15s;margin-left:auto}
+    .refresh-btn:hover{background:rgba(200,169,126,.18)}
+    .refresh-btn.loading svg{animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .stats-bar{padding:12px 52px;display:flex;gap:24px;border-bottom:1px solid var(--border)}
+    .stat{display:flex;align-items:baseline;gap:6px}
+    .stat-num{font-family:'DM Serif Display',serif;font-size:1.4rem}
+    .stat-label{font-family:'DM Mono',monospace;font-size:.63rem;color:var(--text2);letter-spacing:.05em;text-transform:uppercase}
+    .stat-div{width:1px;height:22px;background:var(--border);align-self:center}
+
+    main{padding:24px 52px 100px}
+
+    /* Person cards on dashboard */
+    .people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+
+    .pcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s,transform .15s;animation:fadeIn .3s ease both;cursor:default}
+    .pcard:hover{transform:translateY(-1px)}
+    /* Border color by urgency */
+    .u5{border-color:rgba(74,222,128,.35)!important}
+    .u4{border-color:rgba(96,165,250,.3)!important}
+    .u3{border-color:rgba(250,204,21,.3)!important}
+    .u2{border-color:rgba(251,146,60,.35)!important}
+    .u1{border-color:rgba(248,113,113,.4)!important}
+    .u0{border-color:var(--border)!important}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+    .pcard-top{display:flex;align-items:center;gap:12px}
+    .pcard-av{width:42px;height:42px;border-radius:50%;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:1rem;color:var(--text2);overflow:hidden;position:relative}
+    .pcard-av img{width:100%;height:100%;object-fit:cover}
+    .urgency-ring{position:absolute;inset:-2px;border-radius:50%;border:2px solid transparent;pointer-events:none}
+    .pcard-info{flex:1;min-width:0}
+    .pcard-name{font-size:.9rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+    .pcard-networks{display:flex;flex-wrap:wrap;gap:4px}
+    .net-pill{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.04em;color:var(--text2);background:var(--surface2);border:1px solid var(--border);padding:1px 7px;border-radius:20px}
+    .pcard-badge{font-family:'DM Mono',monospace;font-size:.7rem;font-weight:500;padding:3px 9px;border-radius:100px;white-space:nowrap;flex-shrink:0;align-self:flex-start}
+    .pcard-preview{font-size:.75rem;color:var(--text2);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pcard-members{border-top:1px solid var(--border);margin-top:4px;padding-top:10px;display:flex;flex-direction:column;gap:6px;animation:fadeUp .15s ease both}
+    .pcard-member{display:flex;align-items:center;gap:8px}
+    .pcard-member-av{width:22px;height:22px;border-radius:50%;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:.55rem;color:var(--text2);overflow:hidden}
+    .pcard-member-av img{width:100%;height:100%;object-fit:cover}
+    .pcard-member-name{font-size:.78rem;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pcard-member-handle{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--text3)}
+    .pcard-expand{background:none;border:none;color:var(--text3);font-family:'DM Mono',monospace;font-size:.62rem;cursor:pointer;padding:0;margin-top:2px;transition:color .15s;letter-spacing:.03em;text-align:left}
+    .pcard-expand:hover{color:var(--text2)}
+    .pcard-edit-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:.75rem;cursor:pointer;padding:2px 7px;line-height:1.4;transition:all .15s;flex-shrink:0;margin-left:4px}
+    .pcard-edit-btn:hover{border-color:var(--accent-border);color:var(--accent)}
+
+    /* Urgency */
+    .u5 .urgency-ring{border-color:rgba(74,222,128,.4)}  .u5 .pcard-badge{background:rgba(74,222,128,.1);color:var(--green)}
+    .u4 .urgency-ring{border-color:rgba(96,165,250,.35)} .u4 .pcard-badge{background:rgba(96,165,250,.1);color:var(--blue)}
+    .u3 .urgency-ring{border-color:rgba(250,204,21,.3)}  .u3 .pcard-badge{background:rgba(250,204,21,.1);color:var(--yellow)}
+    .u2 .urgency-ring{border-color:rgba(251,146,60,.35)} .u2 .pcard-badge{background:rgba(251,146,60,.1);color:var(--orange)}
+    .u1 .urgency-ring{border-color:rgba(248,113,113,.4)} .u1 .pcard-badge{background:rgba(248,113,113,.1);color:var(--red)}
+    .u0 .pcard-badge{background:var(--border);color:var(--text3)}
+
+    /* FAB */
+    .fab{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:13px 28px;background:var(--accent-dim);border:1px solid var(--accent-border);border-radius:100px;color:var(--accent);font-family:'DM Mono',monospace;font-size:.75rem;letter-spacing:.06em;cursor:pointer;transition:all .2s;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:40;white-space:nowrap}
+    .fab:hover{background:rgba(200,169,126,.22);border-color:var(--accent);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+
+    /* Drag and drop */
+    .people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+    .pcard{cursor:grab}
+    .pcard:active{cursor:grabbing}
+    .pcard.dragging{opacity:.4;transform:scale(.97)}
+    .pcard.drag-over{border-color:var(--accent-border);background:var(--accent-dim)}
+    .empty-state .icon{font-size:2.5rem;margin-bottom:14px}
+    .empty-state h2{font-family:'DM Serif Display',serif;font-size:1.4rem;font-weight:400;margin-bottom:10px}
+    .empty-state p{color:var(--text2);font-size:.85rem;max-width:360px;margin:0 auto;line-height:1.7}
+
+    /* Log search panel */
+    .log-panel{position:fixed;top:0;right:0;bottom:0;width:360px;background:var(--surface);border-left:1px solid var(--border);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+    .log-panel.open{transform:translateX(0)}
+    .log-header{padding:20px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .log-header h3{font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:400;flex:1}
+    .log-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:1.1rem;padding:4px}
+    .log-close:hover{color:var(--text)}
+    .log-search{padding:12px 16px;border-bottom:1px solid var(--border)}
+    .log-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.83rem;padding:9px 12px;outline:none;transition:border-color .2s}
+    .log-search input:focus{border-color:var(--border-light)}
+    .log-search input::placeholder{color:var(--text3)}
+    .log-results{flex:1;overflow-y:auto;padding:8px}
+    .log-results::-webkit-scrollbar{width:3px}
+    .log-results::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
+    .log-item{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:8px;transition:background .15s}
+    .log-item:hover{background:var(--surface2)}
+    .log-item-av{width:34px;height:34px;border-radius:50%;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:.8rem;color:var(--text2);overflow:hidden}
+    .log-item-av img{width:100%;height:100%;object-fit:cover}
+    .log-item-info{flex:1;min-width:0}
+    .log-item-name{font-size:.85rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .log-item-meta{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--text2);margin-top:2px}
+    .log-item-days{font-family:'DM Mono',monospace;font-size:.68rem;padding:2px 7px;border-radius:100px;background:var(--border);color:var(--text3);flex-shrink:0}
+    .log-empty{text-align:center;padding:40px 16px;color:var(--text2);font-size:.83rem}
+    .log-overlay{position:fixed;inset:0;z-index:49;display:none}
+    .log-overlay.open{display:block}
+
+    /* Edit panel */
+    .edit-panel{position:fixed;top:0;right:0;bottom:0;width:420px;background:var(--surface);border-left:1px solid var(--border);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+    .edit-panel.open{transform:translateX(0)}
+    .edit-panel-header{padding:20px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .edit-panel-header h3{font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:400;flex:1}
+    .edit-panel-body{flex:1;overflow-y:auto;padding:16px}
+    .edit-panel-body::-webkit-scrollbar{width:3px}
+    .edit-panel-body::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
+    .edit-panel-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px}
+    .edit-panel-footer .btn{flex:1}
+    .edit-panel .person-card{box-shadow:none;border-color:var(--border)}
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ SETUP WIZARD ══════════════ -->
+<div id="setup">
+<div class="wizard">
+
+  <div class="steps">
+    <div class="step-dot active" id="dot-1">1</div>
+    <div class="step-line"></div>
+    <div class="step-dot" id="dot-2">✓</div>
+  </div>
+
+  <!-- Step 1: Add people -->
+  <div class="wstep active" id="wstep-1">
+    <h2>Who do you want to keep up with?</h2>
+    <p>Type each person's name, then search to link their chats — DMs and group chats both work. Same person on multiple platforms? Link them all under one name.</p>
+
+    <div class="people-list" id="people-list"></div>
+    <button class="add-person-btn" onclick="addPerson()">+ Add another person</button>
+  </div>
+
+  <!-- Step 2: Done -->
+  <div class="wstep" id="wstep-2">
+    <div class="done-icon">🎉</div>
+    <h2>You're all set.</h2>
+    <p>Your people are ready. Hit the ⚙ icon anytime to add or change who you're tracking.</p>
+  </div>
+
+  <div class="wizard-nav">
+    <button class="btn btn-ghost" id="btn-back" onclick="wizardBack()" style="visibility:hidden">← Back</button>
+    <button class="btn btn-primary" id="btn-next" onclick="wizardNext()">Continue →</button>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════ LOG SEARCH PANEL ══════════════ -->
+<div class="log-overlay" id="logOverlay" onclick="closeLog()"></div>
+<div class="log-panel" id="logPanel">
+  <div class="log-header">
+    <h3>Contact log</h3>
+    <button class="log-close" onclick="closeLog()">✕</button>
+  </div>
+  <div class="log-search">
+    <input type="text" id="logSearchInput" placeholder="Search all contacts…" oninput="renderLog()">
+  </div>
+  <div class="log-results" id="logResults">
+    <div class="log-empty">Type to search through all your Beeper contacts.</div>
+  </div>
+</div>
+
+<!-- ══════════════ EDIT PANEL ══════════════ -->
+<div class="edit-panel" id="editPanel">
+  <div class="edit-panel-header">
+    <h3 id="editPanelTitle">Add person</h3>
+    <button class="log-close" onclick="closeEditPanel()">✕</button>
+  </div>
+  <div class="edit-panel-body" id="editPanelBody"></div>
+  <div class="edit-panel-footer">
+    <button class="btn btn-ghost" id="editPanelDelete" style="display:none;color:var(--red);border-color:rgba(248,113,113,.3)" onclick="deleteEditPerson()">Remove</button>
+    <button class="btn btn-primary" onclick="saveEditPerson()">Save →</button>
+  </div>
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <h1>AntiGhoster</h1>
+      <p>Your people — sorted by who needs a message</p>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="statusPill">
+        <div class="status-dot"></div>
+        <span id="statusText">connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search…">
+    </div>
+    <button class="icon-btn" title="Search contact logs" onclick="openLog()" style="margin-left:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+    </button>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadPeople()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="stats-bar" id="statsBar" style="display:none">
+    <div class="stat"><span class="stat-num" id="statTotal">—</span><span class="stat-label">People</span></div>
+    <div class="stat-div"></div>
+    <div class="stat"><span class="stat-num" id="statOverdue" style="color:var(--red)">—</span><span class="stat-label">Overdue</span></div>
+    <div class="stat-div"></div>
+    <div class="stat"><span class="stat-num" id="statFresh" style="color:var(--green)">—</span><span class="stat-label">This week</span></div>
+  </div>
+
+  <main id="mainContent">
+    <div class="empty-state"><div class="icon">⏳</div><h2>Loading…</h2></div>
+  </main>
+
+  <!-- Floating add button -->
+  <button class="fab" onclick="openAddPanel()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+    Add Person
+  </button>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const S = {
+  step: 1,
+  settings: {},
+  rawContacts: [],
+  rawGroups: [],
+  expandedGroups: new Set(),
+  // people being built: [{id, display_name, chat_ids: []}]
+  people: [],
+  allPeople: [],
+};
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+async function init() {
+  const r = await fetch('/api/settings');
+  S.settings = await r.json();
+  S.expandedGroups = new Set(S.settings.expanded_groups || []);
+  S.people = deepClone(S.settings.people || []);
+
+  if (S.settings.setup_complete) {
+    showApp();
+  } else {
+    loadRaw();
+    showSetup();
+  }
+  checkStatus();
+}
+
+function deepClone(x) { return JSON.parse(JSON.stringify(x)); }
+
+// ════════════════════════════════════════
+// SETUP
+// ════════════════════════════════════════
+function showSetup() {
+  document.getElementById('setup').classList.remove('hidden');
+  document.getElementById('app').classList.remove('visible');
+  goStep(1);
+}
+
+function showApp() {
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  loadPeople();
+  setInterval(loadPeople, 120000);
+}
+
+function goStep(n) {
+  S.step = n;
+  document.querySelectorAll('.wstep').forEach(el => el.classList.remove('active'));
+  document.getElementById(`wstep-${n}`).classList.add('active');
+  for (let i = 1; i <= 2; i++) {
+    const d = document.getElementById(`dot-${i}`);
+    d.className = 'step-dot' + (i < n ? ' done' : i === n ? ' active' : '');
+  }
+  document.getElementById('btn-back').style.visibility = n === 1 ? 'hidden' : 'visible';
+  document.getElementById('btn-next').textContent = n === 2 ? 'Open Dashboard →' : 'Continue →';
+  if (n === 1) renderPeopleList();
+}
+
+function wizardNext() {
+  if (S.step < 2) goStep(S.step + 1);
+  else finishSetup();
+}
+function wizardBack() { if (S.step > 1) goStep(S.step - 1); }
+
+async function finishSetup() {
+  const settings = {
+    setup_complete:  true,
+    people:          S.people.filter(p => p.display_name.trim()),
+    expanded_groups: [...S.expandedGroups],
+  };
+  await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(settings)});
+  S.settings = settings;
+  showApp();
+}
+
+async function loadRaw() {
+  try {
+    const r = await fetch('/api/contacts/raw');
+    const d = await r.json();
+    S.rawContacts = d.contacts || [];
+    S.rawGroups   = d.groups   || [];
+    if (S.step === 1) renderPeopleList();
+    if (S.step === 2) renderGroups();
+  } catch {}
+}
+
+// ════════════════════════════════════════
+// STEP 1 — PEOPLE BUILDER
+// ════════════════════════════════════════
+function addPerson(name='') {
+  S.people.push({ id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2), display_name: name, chat_ids: [] });
+  renderPeopleList();
+  // Focus the new input
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.person-name-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removePerson(id) {
+  S.people = S.people.filter(p => p.id !== id);
+  renderPeopleList();
+}
+
+function getPeopleList() { return S._editPerson ? [S._editPerson] : S.people; }
+
+function updatePersonName(id, name) {
+  const p = getPeopleList().find(p => p.id === id);
+  if (!p) return;
+  p.display_name = name;
+  if (S._editPerson) document.getElementById('editPanelTitle').textContent = name || 'Add person';
+  clearTimeout(window._suggTimer);
+  window._suggTimer = setTimeout(() => {
+    const inp = document.getElementById(`linksearch-${id}`);
+    if (inp) { inp.value = name; renderLinkResults(id); showLinkResults(id); }
+  }, 250);
+}
+
+function linkChat(personId, chatId) {
+  const p = getPeopleList().find(p => p.id === personId);
+  if (p && !p.chat_ids.includes(chatId)) p.chat_ids.push(chatId);
+  refreshCardChips(personId);
+  const inp = document.getElementById(`linksearch-${personId}`);
+  if (inp) { inp.value = ''; }
+  hideLinkResults(personId);
+}
+
+function unlinkChat(personId, chatId) {
+  const p = getPeopleList().find(p => p.id === personId);
+  if (p) p.chat_ids = p.chat_ids.filter(id => id !== chatId);
+  refreshCardChips(personId);
+}
+
+function refreshCardChips(id) {
+  const p    = getPeopleList().find(p => p.id === id);
+  const card = document.getElementById(`pcard-${p.id}`);
+  if (!card) return;
+  card.classList.toggle('has-chats', p.chat_ids.length > 0);
+  let chipsEl = card.querySelector('.person-chats');
+  if (p.chat_ids.length) {
+    const html = p.chat_ids.map(cid => {
+      const c = S.rawContacts.find(x => x.id === cid) || S.rawGroups.find(x => x.id === cid);
+      if (!c) return '';
+      const initials = (c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const av      = c.avatar ? `<img src="${avatarUrl(c.avatar)}" onerror="this.parentElement.innerHTML='${initials}'">` : initials;
+      const isGroup = c.is_group || c.member_count > 1;
+      const tag     = isGroup ? `<span style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--purple)">group</span>` : '';
+      return `<div class="chat-chip">
+        <div class="chat-chip-av">${av}</div>
+        <span class="chat-chip-name">${e(c.name)}</span>
+        <span class="chat-chip-net">${e(c.network)}</span>
+        ${tag}
+        <button class="chat-chip-x" onclick="unlinkChat('${p.id}','${cid}')" title="Remove">✕</button>
+      </div>`;
+    }).join('');
+    if (chipsEl) { chipsEl.innerHTML = html; }
+    else {
+      const newEl = document.createElement('div');
+      newEl.className = 'person-chats';
+      newEl.innerHTML = html;
+      card.querySelector('.person-header').insertAdjacentElement('afterend', newEl);
+    }
+  } else {
+    if (chipsEl) chipsEl.remove();
+  }
+}
+
+// Link search dropdown
+function showLinkResults(personId) {
+  renderLinkResults(personId);
+  const res = document.getElementById(`linkresults-${personId}`);
+  if (res) res.classList.remove('hidden');
+}
+
+function hideLinkResults(personId) {
+  const res = document.getElementById(`linkresults-${personId}`);
+  if (res) res.classList.add('hidden');
+}
+
+function renderLinkResults(personId) {
+  const inp = document.getElementById(`linksearch-${personId}`);
+  const res = document.getElementById(`linkresults-${personId}`);
+  if (!inp || !res) return;
+
+  const q      = inp.value.toLowerCase().trim();
+  const linked = getLinkedIds();
+
+  // Combine DMs and group chats, excluding already-linked ones
+  const allChats = [
+    ...S.rawContacts.map(c => ({...c, _isGroup: false})),
+    ...S.rawGroups.filter(g => g.member_count > 1).map(g => ({...g, _isGroup: true})),
+  ].filter(c => !linked.has(c.id));
+
+  let candidates;
+  if (q) {
+    candidates = allChats
+      .filter(c =>
+        (c.name||'').toLowerCase().includes(q) ||
+        (c.handle||'').toLowerCase().includes(q) ||
+        (c.network||'').toLowerCase().includes(q)
+      )
+      .map(c => ({ c, score: fuzzyScore(c, q) }))
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.c);
+  } else {
+    const withTs = allChats.filter(c => c.days_since !== null).sort((a,b) => a.days_since - b.days_since);
+    const noTs   = allChats.filter(c => c.days_since === null).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    candidates   = [...withTs, ...noTs];
+  }
+
+  if (!candidates.length) {
+    res.innerHTML = `<div style="padding:10px 12px;color:var(--text3);font-size:.78rem">No contacts found</div>`;
+    res.classList.remove('hidden');
+    return;
+  }
+
+  res.innerHTML = candidates.map(c => {
+    const initials = (c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const av      = c.avatar ? `<img src="${avatarUrl(c.avatar)}" onerror="this.parentElement.innerHTML='${initials}'">` : initials;
+    const isGroup = c._isGroup || c.is_group;
+    const meta    = isGroup
+      ? `${e(c.network)} · ${c.member_count} people`
+      : `${e(c.network)}${c.handle ? ' · ' + e(c.handle) : ''}`;
+    const groupTag = isGroup ? `<span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--purple);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:1px 6px;border-radius:4px;margin-left:4px">group</span>` : '';
+    return `<div class="link-result-item" onmousedown="linkChat('${personId}','${c.id}')">
+      <div class="link-result-av">${av}</div>
+      <div class="link-result-info">
+        <span class="link-result-name">${e(c.name)}${groupTag}</span>
+        <span class="link-result-net">${meta}</span>
+      </div>
+      <span class="link-result-days">${c.days_since !== null ? c.days_since + 'd' : '—'}</span>
+    </div>`;
+  }).join('');
+  res.classList.remove('hidden');
+}
+
+// Hide results when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.link-search-wrap')) {
+    document.querySelectorAll('.link-results').forEach(el => el.classList.add('hidden'));
+  }
+});
+
+function refreshCardSuggestions() {} // no-op, kept for safety
+
+function getLinkedIds() {
+  // Only DMs are exclusive — group chats can be shared across multiple people
+  const groupIds = new Set([...S.rawGroups.map(g => g.id)]);
+  return new Set(
+    getPeopleList().flatMap(p => p.chat_ids.filter(id => !groupIds.has(id)))
+  );
+}
+
+// Fuzzy score: how well does contact name match query
+function fuzzyScore(contact, query) {
+  if (!query) return 0;
+  const q   = query.toLowerCase().trim();
+  const n   = (contact.name || '').toLowerCase();
+  const h   = (contact.handle || '').toLowerCase();
+  if (!q) return 0;
+  if (n === q || h === q) return 100;
+  if (n.startsWith(q) || h.startsWith(q)) return 80;
+  if (n.includes(q) || h.includes(q)) return 60;
+  // token match
+  const qTokens = q.split(/\s+/);
+  const nTokens = n.split(/\s+/);
+  const hits = qTokens.filter(qt => nTokens.some(nt => nt.startsWith(qt)));
+  if (hits.length) return 40 + (hits.length / qTokens.length) * 20;
+  return 0;
+}
+
+function getSuggestions(person) {
+  const linked = getLinkedIds();
+  const q      = person.display_name.trim();
+  if (!q || q.length < 2) return [];
+
+  return S.rawContacts
+    .filter(c => !linked.has(c.id) || person.chat_ids.includes(c.id))
+    .filter(c => !linked.has(c.id)) // exclude already linked to other people
+    .map(c => ({ contact: c, score: fuzzyScore(c, q) }))
+    .filter(x => x.score >= 40)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6)
+    .map(x => x.contact);
+}
+
+function renderPeopleList() {
+  const el = document.getElementById('people-list');
+  if (!el) return;
+  const list = S._editPerson ? [S._editPerson] : S.people;
+  if (!list.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = list.map((person, i) => {
+    const chipsHtml = person.chat_ids.map(cid => {
+      const c = S.rawContacts.find(x => x.id === cid) || S.rawGroups.find(x => x.id === cid);
+      if (!c) return '';
+      const initials = (c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const av      = c.avatar ? `<img src="${avatarUrl(c.avatar)}" onerror="this.parentElement.innerHTML='${initials}'">` : initials;
+      const isGroup = c.is_group || c.member_count > 1;
+      const tag     = isGroup ? `<span style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--purple)">group</span>` : '';
+      return `<div class="chat-chip">
+        <div class="chat-chip-av">${av}</div>
+        <span class="chat-chip-name">${e(c.name)}</span>
+        <span class="chat-chip-net">${e(c.network)}</span>
+        ${tag}
+        <button class="chat-chip-x" onclick="unlinkChat('${person.id}','${cid}')" title="Remove">✕</button>
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="person-card${person.chat_ids.length ? ' has-chats' : ''}" id="pcard-${person.id}">
+        <div class="person-header">
+          <span class="person-num">${i+1}</span>
+          <input class="person-name-input" placeholder="Their name (e.g. Sarah)" value="${ea(person.display_name)}"
+            oninput="updatePersonName('${person.id}', this.value)"
+            onfocus="if(this.value){updatePersonName('${person.id}',this.value)}"
+            onkeydown="if(event.key==='Enter')addPerson()">
+          <button class="person-del" onclick="removePerson('${person.id}')" title="Remove">✕</button>
+        </div>
+        ${person.chat_ids.length ? `<div class="person-chats">${chipsHtml}</div>` : ''}
+        <div class="person-link-row">
+          <div class="link-search-wrap">
+            <input class="link-search" placeholder="Search Beeper contacts to link…"
+              id="linksearch-${person.id}"
+              oninput="renderLinkResults('${person.id}')"
+              onfocus="showLinkResults('${person.id}')"
+              autocomplete="off">
+            <div class="link-results hidden" id="linkresults-${person.id}"></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function initPeopleSlots() {
+  if (!S.people.length) {
+    S.people.push({ id: 'p_init_0', display_name: '', chat_ids: [] });
+  }
+  renderPeopleList();
+}
+
+// ════════════════════════════════════════
+// STEP 2 — GROUPS
+// ════════════════════════════════════════
+function renderGroups() {
+  const el = document.getElementById('groups-list');
+  const groups = S.rawGroups.filter(g => g.member_count > 1);
+  if (!groups.length) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:.8rem;padding:12px">No group chats found.</div>';
+    return;
+  }
+  el.innerHTML = groups.map(g => {
+    const checked  = S.expandedGroups.has(g.id) ? 'checked' : '';
+    const members  = (g.members||[]).slice(0,3).map(m => m.name||m.handle).filter(Boolean).join(', ');
+    const extra    = g.member_count > 3 ? ` +${g.member_count-3}` : '';
+    return `
+      <div class="group-row">
+        <div class="group-row-info">
+          <div class="group-row-name">${e(g.name)}</div>
+          <div class="group-row-meta">${g.member_count} people · ${e(g.network)}${members ? ` · ${e(members)}${extra}` : ''}</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${checked} onchange="toggleGroup('${g.id}',this.checked)">
+          <div class="toggle-track"></div>
+        </label>
+      </div>`;
+  }).join('');
+}
+
+function toggleGroup(id, on) { on ? S.expandedGroups.add(id) : S.expandedGroups.delete(id); }
+
+// ════════════════════════════════════════
+// EDIT PANEL
+// ════════════════════════════════════════
+let _editPersonId = null; // null = new person
+
+async function openAddPanel() {
+  _editPersonId = null;
+  document.getElementById('editPanelTitle').textContent = 'Add person';
+  document.getElementById('editPanelDelete').style.display = 'none';
+  if (!S.rawContacts.length) await loadRaw();
+  // Build a fresh temp person
+  const tempId = 'p_new_' + Date.now();
+  S._editPerson = { id: tempId, display_name: '', chat_ids: [] };
+  renderEditPanel();
+  document.getElementById('editPanel').classList.add('open');
+  document.getElementById('logOverlay').classList.add('open');
+  setTimeout(() => document.querySelector('#editPanelBody .person-name-input')?.focus(), 100);
+}
+
+async function openEditPanel(personId) {
+  const p = S.settings.people?.find(p => p.id === personId);
+  if (!p) return;
+  _editPersonId = personId;
+  document.getElementById('editPanelTitle').textContent = 'Edit ' + p.display_name;
+  document.getElementById('editPanelDelete').style.display = 'block';
+  if (!S.rawContacts.length) await loadRaw();
+  S._editPerson = deepClone(p);
+  // Temporarily inject into S.people so renderPeopleList-style functions work
+  S.people = [S._editPerson];
+  renderEditPanel();
+  document.getElementById('editPanel').classList.add('open');
+  document.getElementById('logOverlay').classList.add('open');
+}
+
+function renderEditPanel() {
+  const body = document.getElementById('editPanelBody');
+  // Reuse the people-list render for a single person
+  const container = document.createElement('div');
+  container.id = 'people-list';
+  body.innerHTML = '';
+  body.appendChild(container);
+  renderPeopleList();
+}
+
+function closeEditPanel() {
+  document.getElementById('editPanel').classList.remove('open');
+  document.getElementById('logOverlay').classList.remove('open');
+  S._editPerson = null;
+  S.people = deepClone(S.settings.people || []);
+}
+
+async function saveEditPerson() {
+  const p = S._editPerson || S.people[0];
+  if (!p || !p.display_name.trim()) {
+    document.querySelector('#editPanelBody .person-name-input')?.focus();
+    return;
+  }
+  const people = deepClone(S.settings.people || []);
+  if (_editPersonId) {
+    const idx = people.findIndex(x => x.id === _editPersonId);
+    if (idx >= 0) people[idx] = p; else people.push(p);
+  } else {
+    people.push(p);
+  }
+  const settings = { ...S.settings, people, setup_complete: true };
+  await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(settings) });
+  S.settings = settings;
+  closeEditPanel();
+  loadPeople();
+}
+
+async function deleteEditPerson() {
+  if (!_editPersonId) return;
+  const people = (S.settings.people || []).filter(p => p.id !== _editPersonId);
+  const settings = { ...S.settings, people };
+  await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(settings) });
+  S.settings = settings;
+  closeEditPanel();
+  loadPeople();
+}
+
+async function openSettings() { await openAddPanel(); } // compat alias
+
+// ════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════
+async function loadPeople() {
+  document.getElementById('refreshBtn').classList.add('loading');
+  try {
+    const r = await fetch('/api/people');
+    const d = await r.json();
+    if (d.error) { showError(d.error); return; }
+    S.allPeople = d.people || [];
+    updateStats();
+    render();
+    document.getElementById('statsBar').style.display = 'flex';
+  } catch { showError('Could not reach app.py. Is it still running?'); }
+  finally { document.getElementById('refreshBtn').classList.remove('loading'); }
+}
+
+function updateStats() {
+  const w = S.allPeople.filter(p => p.days_since !== null);
+  document.getElementById('statTotal').textContent   = S.allPeople.length;
+  document.getElementById('statOverdue').textContent = w.filter(p => p.days_since >= 14).length;
+  document.getElementById('statFresh').textContent   = w.filter(p => p.days_since <= 7).length;
+}
+
+function render() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let people = [...S.allPeople];
+
+  if (!people.length) {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">👋</div>
+        <h2>No one added yet</h2>
+        <p>Set up the people you want to keep in touch with.</p>
+        <button class="btn btn-primary" style="margin-top:20px" onclick="openSettings()">Add people →</button>
+      </div>`;
+    return;
+  }
+
+  if (q) people = people.filter(p => (p.display_name||'').toLowerCase().includes(q));
+
+  // Sort: longest since last texted first, waiting_on_you second, no data last
+  people.sort((a, b) => {
+    const aD = a.days_since;
+    const bD = b.days_since;
+    if (aD !== null && bD !== null) return bD - aD;          // both have data — most neglected first
+    if (aD !== null) return -1;                               // a has data, b doesn't — a first
+    if (bD !== null) return 1;                                // b has data, a doesn't — b first
+    if (a.waiting_on_you && !b.waiting_on_you) return -1;    // waiting_on_you before no data
+    if (!a.waiting_on_you && b.waiting_on_you) return 1;
+    return 0;
+  });
+
+  if (!people.length) {
+    document.getElementById('mainContent').innerHTML =
+      `<div class="empty-state"><div class="icon">🔍</div><h2>No one found</h2><p>Try a different name.</p></div>`;
+    return;
+  }
+
+  const html = `<div class="people-grid" id="peopleGrid">${people.map((p, i) => pcardHTML(p, i)).join('')}</div>`;
+  document.getElementById('mainContent').innerHTML = html;
+  document.querySelectorAll('.pcard').forEach((el, i) => {
+    el.style.animationDelay = `${i * 20}ms`;
+    initDrag(el);
+  });
+}
+
+// ════════════════════════════════════════
+// DRAG AND DROP
+// ════════════════════════════════════════
+let dragSrc = null;
+
+function initDrag(el) {
+  el.setAttribute('draggable', 'true');
+
+  el.addEventListener('dragstart', e => {
+    dragSrc = el;
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', el.dataset.personId);
+  });
+
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    document.querySelectorAll('.pcard').forEach(c => c.classList.remove('drag-over'));
+    saveOrder();
+  });
+
+  el.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (el !== dragSrc) {
+      document.querySelectorAll('.pcard').forEach(c => c.classList.remove('drag-over'));
+      el.classList.add('drag-over');
+    }
+  });
+
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!dragSrc || dragSrc === el) return;
+    const grid = el.closest('.people-grid');
+    const cards = [...grid.querySelectorAll('.pcard')];
+    const srcIdx = cards.indexOf(dragSrc);
+    const tgtIdx = cards.indexOf(el);
+    if (srcIdx < tgtIdx) el.after(dragSrc);
+    else el.before(dragSrc);
+    el.classList.remove('drag-over');
+  });
+}
+
+async function saveOrder() {
+  const cards = document.querySelectorAll('#peopleGrid .pcard');
+  const order = [...cards].map(c => c.dataset.personId).filter(Boolean);
+  S.settings.people_order = order;
+  await fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({people_order: order})
+  });
+}
+
+
+function pcardHTML(p, idx) {
+  const initials = (p.display_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const av      = p.avatar ? `<img src="${avatarUrl(p.avatar)}" alt="" onerror="this.parentElement.innerHTML='${initials}'">` : initials;
+  const urgency = p.urgency || 0;
+
+  let dayLabel, badgeStyle;
+  if (p.days_since !== null) {
+    dayLabel = p.days_since === 0 ? 'today'
+      : p.days_since === 1 ? 'yesterday'
+      : `${p.days_since}d ago`;
+    badgeStyle = '';
+  } else if (p.waiting_on_you) {
+    dayLabel   = 'reply?';
+    badgeStyle = `background:rgba(167,139,250,.12);color:var(--purple);`;
+  } else {
+    dayLabel   = '—';
+    badgeStyle = '';
+  }
+
+  const nets = (p.networks||[]).map(n => `<span class="net-pill">${e(n)}</span>`).join('');
+
+  const groupChats  = (p.linked_chats||[]).filter(c => c.is_group && c.member_count > 1);
+  const allMembers  = groupChats.flatMap(c => (c.members||[]).map(m => ({...m, groupName: c.name})));
+  const hasGroups   = allMembers.length > 0;
+
+  return `
+    <div class="pcard u${urgency}" id="pcard-dash-${e(p.id)}" data-person-id="${e(p.id)}">
+      <div class="pcard-top">
+        <div class="pcard-av">
+          ${av}
+          <div class="urgency-ring"></div>
+        </div>
+        <div class="pcard-info">
+          <div class="pcard-name">${e(p.display_name)}</div>
+          <div class="pcard-networks">${nets}</div>
+        </div>
+        <span class="pcard-badge" style="${badgeStyle}">${dayLabel}</span>
+        <button class="pcard-edit-btn" onclick="openEditPanel('${e(p.id)}')" title="Edit">✎</button>
+      </div>
+      ${hasGroups ? `<button class="pcard-expand" onclick="toggleMembers('${e(p.id)}', this)">
+        ↓ ${allMembers.length} group member${allMembers.length !== 1 ? 's' : ''}
+      </button>
+      <div class="pcard-members" id="members-${e(p.id)}" style="display:none">
+        ${allMembers.map(m => {
+          const mi  = (m.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+          const mav = m.avatar ? `<img src="${avatarUrl(m.avatar)}" onerror="this.parentElement.innerHTML='${mi}'">` : mi;
+          return `<div class="pcard-member">
+            <div class="pcard-member-av">${mav}</div>
+            <span class="pcard-member-name">${e(m.name||'Unknown')}</span>
+            ${m.handle ? `<span class="pcard-member-handle">${e(m.handle)}</span>` : ''}
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+function toggleMembers(personId, btn) {
+  const el = document.getElementById(`members-${personId}`);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'flex';
+  el.style.flexDirection = 'column';
+  btn.textContent = open
+    ? `↓ ${el.children.length} group member${el.children.length !== 1 ? 's' : ''}`
+    : `↑ hide members`;
+}
+
+function showError(msg) {
+  document.getElementById('mainContent').innerHTML =
+    `<div class="empty-state"><div class="icon">⚠️</div><h2>Connection error</h2><p>${msg}</p></div>`;
+}
+
+async function checkStatus() {
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
+  try {
+    const r = await fetch('/api/status');
+    if (r.ok) { pill.className='status-pill connected'; text.textContent='beeper connected'; }
+    else throw 0;
+  } catch { pill.className='status-pill error'; text.textContent='not connected'; }
+}
+
+// ════════════════════════════════════════
+// CONTACT LOG SEARCH
+// ════════════════════════════════════════
+async function openLog() {
+  document.getElementById('logPanel').classList.add('open');
+  document.getElementById('logOverlay').classList.add('open');
+  if (!S.rawContacts.length) await loadRaw();
+  document.getElementById('logSearchInput').focus();
+  renderLog();
+}
+
+function closeLog() {
+  document.getElementById('logPanel').classList.remove('open');
+  document.getElementById('logOverlay').classList.remove('open');
+}
+
+function renderLog() {
+  const q   = document.getElementById('logSearchInput').value.toLowerCase().trim();
+  const el  = document.getElementById('logResults');
+  const all = [...S.rawContacts, ...S.rawGroups];
+
+  if (!q) {
+    el.innerHTML = '<div class="log-empty">Type to search through all your Beeper contacts.</div>';
+    return;
+  }
+
+  const matches = all.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.handle||'').toLowerCase().includes(q) ||
+    (c.network||'').toLowerCase().includes(q)
+  ).slice(0, 40);
+
+  if (!matches.length) {
+    el.innerHTML = '<div class="log-empty">No contacts found.</div>';
+    return;
+  }
+
+  el.innerHTML = matches.map(c => {
+    const initials = (c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const av   = c.avatar ? `<img src="${avatarUrl(c.avatar)}" onerror="this.parentElement.innerHTML='${initials}'">` : initials;
+    const dayLabel = c.days_since === null ? '—'
+      : c.days_since === 0 ? 'today'
+      : c.days_since === 1 ? 'yesterday'
+      : `${c.days_since}d`;
+    return `
+      <div class="log-item">
+        <div class="log-item-av">${av}</div>
+        <div class="log-item-info">
+          <div class="log-item-name">${e(c.name)}</div>
+          <div class="log-item-meta">${e(c.network)}${c.handle ? ' · ' + e(c.handle) : ''}${c.is_group ? ` · ${c.member_count} people` : ''}</div>
+        </div>
+        <span class="log-item-days">${dayLabel}</span>
+      </div>`;
+  }).join('');
+}
+
+
+
+document.getElementById('searchInput').addEventListener('input', render);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLog(); });
+function e(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function ea(s) { return e(s); }
+function avatarUrl(raw) {
+  if (!raw) return null;
+  if (raw.startsWith('file:///') || raw.startsWith('mxc://')) {
+    return '/api/avatar?path=' + encodeURIComponent(raw);
+  }
+  return raw;
+}
+
+// ════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════
+async function boot() {
+  await init();
+  // If setup mode, load raw contacts and init 5 empty slots
+  if (!S.settings.setup_complete) {
+    initPeopleSlots();
+  }
+}
+boot();
+</script>
+</body>
+</html>
