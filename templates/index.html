@@ -223,17 +223,35 @@
     .log-overlay{position:fixed;inset:0;z-index:49;display:none}
     .log-overlay.open{display:block}
 
-    /* Edit panel */
-    .edit-panel{position:fixed;top:0;right:0;bottom:0;width:420px;background:var(--surface);border-left:1px solid var(--border);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+    /* ── EDIT PANEL ── */
+    .edit-panel{position:fixed;top:0;right:0;bottom:0;width:420px;background:var(--surface);border-left:1px solid var(--border);z-index:60;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
     .edit-panel.open{transform:translateX(0)}
-    .edit-panel-header{padding:20px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
-    .edit-panel-header h3{font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:400;flex:1}
-    .edit-panel-body{flex:1;overflow-y:auto;padding:16px}
+    .edit-panel-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .edit-panel-header h3{font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:400;flex:1;margin:0}
+    .edit-panel-body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:0}
     .edit-panel-body::-webkit-scrollbar{width:3px}
     .edit-panel-body::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
-    .edit-panel-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px}
-    .edit-panel-footer .btn{flex:1}
-    .edit-panel .person-card{box-shadow:none;border-color:var(--border)}
+    .edit-panel-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0}
+    .edit-panel-footer .btn{flex:1;justify-content:center}
+    #app{transition:margin-right .25s ease}
+    #app.panel-open{margin-right:420px}
+    .log-overlay{position:fixed;inset:0;z-index:49;display:none;background:rgba(0,0,0,0)}
+    .log-overlay.open{display:block}
+    #editOverlay{z-index:59;background:rgba(0,0,0,.35)}
+    .ep-label{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:0 0 8px;display:block}
+    .ep-label+*{margin-top:0}
+    #ep-name{display:block;width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Serif Display',serif;font-size:1.1rem;padding:12px 14px;outline:none;transition:border-color .2s;box-sizing:border-box;-webkit-appearance:none;margin-bottom:20px}
+    #ep-name:focus{border-color:var(--border-light)}
+    #ep-name::placeholder{color:var(--text3)}
+    .ep-search-wrap{position:relative;margin-bottom:16px}
+    #ep-search{display:block;width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.83rem;padding:9px 12px;outline:none;transition:border-color .2s;box-sizing:border-box;-webkit-appearance:none}
+    #ep-search:focus{border-color:var(--border-light)}
+    #ep-search::placeholder{color:var(--text3)}
+    .ep-chips{display:flex;flex-wrap:wrap;gap:6px}
+    #ep-results{position:fixed;background:var(--surface2);border:1px solid var(--border-light);border-radius:10px;z-index:400;max-height:260px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.55)}
+    #ep-results.hidden{display:none}
+    #ep-results::-webkit-scrollbar{width:3px}
+    #ep-results::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
   </style>
 </head>
 <body>
@@ -287,17 +305,22 @@
 </div>
 
 <!-- ══════════════ EDIT PANEL ══════════════ -->
+<div class="log-overlay" id="editOverlay" onclick="closeEditPanel()"></div>
 <div class="edit-panel" id="editPanel">
   <div class="edit-panel-header">
     <h3 id="editPanelTitle">Add person</h3>
     <button class="log-close" onclick="closeEditPanel()">✕</button>
   </div>
+  <!-- all content in one scrollable body -->
   <div class="edit-panel-body" id="editPanelBody"></div>
   <div class="edit-panel-footer">
     <button class="btn btn-ghost" id="editPanelDelete" style="display:none;color:var(--red);border-color:rgba(248,113,113,.3)" onclick="deleteEditPerson()">Remove</button>
     <button class="btn btn-primary" onclick="saveEditPerson()">Save →</button>
   </div>
 </div>
+
+<!-- ══════════════ EDIT PANEL DROPDOWN (fixed, appended to body) ══════════════ -->
+<div id="ep-results" class="hidden"></div>
 
 <!-- ══════════════ APP ══════════════ -->
 <div id="app">
@@ -326,7 +349,7 @@
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
       </svg>
     </button>
-    <button class="refresh-btn" id="refreshBtn" onclick="loadPeople()">
+    <button class="refresh-btn" id="refreshBtn" onclick="loadPeople(true)">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
       </svg>
@@ -735,58 +758,174 @@ function toggleGroup(id, on) { on ? S.expandedGroups.add(id) : S.expandedGroups.
 // ════════════════════════════════════════
 // EDIT PANEL
 // ════════════════════════════════════════
-let _editPersonId = null; // null = new person
+let _editPersonId = null;
 
 async function openAddPanel() {
   _editPersonId = null;
+  S._editPerson = { id: 'p_new_' + Date.now(), display_name: '', chat_ids: [] };
   document.getElementById('editPanelTitle').textContent = 'Add person';
   document.getElementById('editPanelDelete').style.display = 'none';
   if (!S.rawContacts.length) await loadRaw();
-  // Build a fresh temp person
-  const tempId = 'p_new_' + Date.now();
-  S._editPerson = { id: tempId, display_name: '', chat_ids: [] };
-  renderEditPanel();
+  _renderEditPanelCard();
   document.getElementById('editPanel').classList.add('open');
-  document.getElementById('logOverlay').classList.add('open');
-  setTimeout(() => document.querySelector('#editPanelBody .person-name-input')?.focus(), 100);
+  document.getElementById('editOverlay').classList.add('open');
+  document.getElementById('app').classList.add('panel-open');
+  setTimeout(() => document.querySelector('#ep-name')?.focus(), 150);
 }
 
 async function openEditPanel(personId) {
-  const p = S.settings.people?.find(p => p.id === personId);
+  const p = (S.settings.people || []).find(p => p.id === personId);
   if (!p) return;
   _editPersonId = personId;
-  document.getElementById('editPanelTitle').textContent = 'Edit ' + p.display_name;
+  S._editPerson = deepClone(p);
+  document.getElementById('editPanelTitle').textContent = 'Edit ' + (p.display_name || 'person');
   document.getElementById('editPanelDelete').style.display = 'block';
   if (!S.rawContacts.length) await loadRaw();
-  S._editPerson = deepClone(p);
-  // Temporarily inject into S.people so renderPeopleList-style functions work
-  S.people = [S._editPerson];
-  renderEditPanel();
+  _renderEditPanelCard();
   document.getElementById('editPanel').classList.add('open');
-  document.getElementById('logOverlay').classList.add('open');
+  document.getElementById('editOverlay').classList.add('open');
+  document.getElementById('app').classList.add('panel-open');
 }
 
-function renderEditPanel() {
+function _renderEditPanelCard() {
+  const p    = S._editPerson;
   const body = document.getElementById('editPanelBody');
-  // Reuse the people-list render for a single person
-  const container = document.createElement('div');
-  container.id = 'people-list';
-  body.innerHTML = '';
-  body.appendChild(container);
-  renderPeopleList();
+
+  const chipsHtml = (p.chat_ids || []).map(cid => {
+    const c = S.rawContacts.find(x => x.id === cid) || S.rawGroups.find(x => x.id === cid);
+    if (!c) return '';
+    const ini = (c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const av  = c.avatar ? `<img src="${avatarUrl(c.avatar)}" onerror="this.parentElement.innerHTML='${ini}'">` : ini;
+    const tag = (c.is_group || c.member_count > 1) ? `<span style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--purple)">group</span>` : '';
+    return `<div class="chat-chip">
+      <div class="chat-chip-av">${av}</div>
+      <span class="chat-chip-name">${e(c.name)}</span>
+      <span class="chat-chip-net">${e(c.network)}</span>
+      ${tag}
+      <button class="chat-chip-x" onclick="_epUnlink('${cid}')" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <label class="ep-label">Name</label>
+    <input id="ep-name" placeholder="Their name (e.g. Sarah)"
+      value="${ea(p.display_name)}"
+      oninput="S._editPerson.display_name=this.value;document.getElementById('editPanelTitle').textContent=this.value||(_editPersonId?'Edit person':'Add person')">
+    <label class="ep-label" style="margin-top:20px">Link chats</label>
+    <div class="ep-search-wrap">
+      <input id="ep-search" placeholder="Search contacts to link…"
+        oninput="_epSearch()" onfocus="_epSearch();_epPositionDropdown()" autocomplete="off">
+    </div>
+    ${chipsHtml ? `<label class="ep-label" style="margin-top:20px">Linked chats</label><div class="ep-chips">${chipsHtml}</div>` : '<p style="margin-top:10px;font-size:.8rem;color:var(--text3);font-family:\'DM Sans\',sans-serif;line-height:1.6">Search above to link Instagram, WhatsApp, or group chats.</p>'}`;
+
+  // Clear search when re-rendering
+  document.getElementById('ep-results')?.classList.add('hidden');
+  // Re-attach focus listener for dropdown positioning
+  setTimeout(() => {
+    const s = document.getElementById('ep-search');
+    if (s) { s.addEventListener('focus', _epPositionDropdown); s.addEventListener('input', _epPositionDropdown); }
+  }, 0);
+}
+
+function _epPositionDropdown() {
+  const inp = document.getElementById('ep-search');
+  const res = document.getElementById('ep-results');
+  if (!inp || !res) return;
+  const rect = inp.getBoundingClientRect();
+  res.style.top   = (rect.bottom + 4) + 'px';
+  res.style.left  = rect.left + 'px';
+  res.style.width = rect.width + 'px';
+}
+
+function _epSearch() {
+  const inp  = document.getElementById('ep-search');
+  const res  = document.getElementById('ep-results');
+  const p    = S._editPerson;
+  if (!inp || !res || !p) return;
+
+  const q       = inp.value.toLowerCase().trim();
+  const myIds   = new Set(p.chat_ids);
+  const takenDMs = new Set(
+    (S.settings.people || [])
+      .filter(x => x.id !== p.id)
+      .flatMap(x => x.chat_ids)
+      .filter(id => !S.rawGroups.find(g => g.id === id))
+  );
+
+  let candidates = [
+    ...S.rawContacts.map(c => ({...c, _isGroup: false})),
+    ...S.rawGroups.filter(g => g.member_count > 1).map(g => ({...g, _isGroup: true})),
+  ].filter(c => !takenDMs.has(c.id) && !myIds.has(c.id));
+
+  if (q) {
+    candidates = candidates
+      .filter(c => (c.name||'').toLowerCase().includes(q) || (c.handle||'').toLowerCase().includes(q) || (c.network||'').toLowerCase().includes(q))
+      .map(c => ({c, score: fuzzyScore(c, q)}))
+      .sort((a,b) => b.score - a.score)
+      .map(x => x.c);
+  } else {
+    const withTs = candidates.filter(c => c.days_since !== null).sort((a,b) => a.days_since - b.days_since);
+    const noTs   = candidates.filter(c => c.days_since === null).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    candidates   = [...withTs, ...noTs];
+  }
+
+  if (!candidates.length) {
+    res.innerHTML = `<div style="padding:10px 12px;color:var(--text3);font-size:.78rem">No contacts found</div>`;
+    _epPositionDropdown();
+    res.classList.remove('hidden');
+    return;
+  }
+
+  res.innerHTML = candidates.map(c => {
+    const ini     = (c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const av      = c.avatar ? `<img src="${avatarUrl(c.avatar)}" onerror="this.parentElement.innerHTML='${ini}'">` : ini;
+    const isGroup = c._isGroup || c.is_group;
+    const meta    = isGroup ? `${e(c.network)} · ${c.member_count} people` : `${e(c.network)}${c.handle ? ' · '+e(c.handle) : ''}`;
+    const gtag    = isGroup ? `<span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--purple);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:1px 6px;border-radius:4px;margin-left:4px">group</span>` : '';
+    return `<div class="link-result-item" onmousedown="_epLink('${c.id}')">
+      <div class="link-result-av">${av}</div>
+      <div class="link-result-info">
+        <span class="link-result-name">${e(c.name)}${gtag}</span>
+        <span class="link-result-net">${meta}</span>
+      </div>
+      <span class="link-result-days">${c.days_since !== null ? c.days_since+'d' : '—'}</span>
+    </div>`;
+  }).join('');
+  _epPositionDropdown();
+  res.classList.remove('hidden');
+}
+
+function _epLink(chatId) {
+  const p = S._editPerson;
+  if (!p || p.chat_ids.includes(chatId)) return;
+  p.chat_ids.push(chatId);
+  document.getElementById('ep-search').value = '';
+  document.getElementById('ep-results').classList.add('hidden');
+  // Only re-render the body (name + chips), not the search section
+  _renderEditPanelCard();
+  // Re-focus search
+  setTimeout(() => document.getElementById('ep-search')?.focus(), 50);
+}
+
+function _epUnlink(chatId) {
+  const p = S._editPerson;
+  if (!p) return;
+  p.chat_ids = p.chat_ids.filter(id => id !== chatId);
+  _renderEditPanelCard();
 }
 
 function closeEditPanel() {
   document.getElementById('editPanel').classList.remove('open');
-  document.getElementById('logOverlay').classList.remove('open');
+  document.getElementById('editOverlay').classList.remove('open');
+  document.getElementById('app').classList.remove('panel-open');
   S._editPerson = null;
-  S.people = deepClone(S.settings.people || []);
 }
 
 async function saveEditPerson() {
-  const p = S._editPerson || S.people[0];
+  const p = S._editPerson;
   if (!p || !p.display_name.trim()) {
-    document.querySelector('#editPanelBody .person-name-input')?.focus();
+    const inp = document.getElementById('ep-name');
+    if (inp) { inp.focus(); inp.style.borderColor='var(--red)'; setTimeout(()=>inp.style.borderColor='',1000); }
     return;
   }
   const people = deepClone(S.settings.people || []);
@@ -797,31 +936,39 @@ async function saveEditPerson() {
     people.push(p);
   }
   const settings = { ...S.settings, people, setup_complete: true };
-  await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(settings) });
+  await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(settings) });
   S.settings = settings;
   closeEditPanel();
-  loadPeople();
+  await loadPeople(true);
 }
 
 async function deleteEditPerson() {
-  if (!_editPersonId) return;
+  if (!_editPersonId) { closeEditPanel(); return; }
   const people = (S.settings.people || []).filter(p => p.id !== _editPersonId);
   const settings = { ...S.settings, people };
-  await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(settings) });
+  await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(settings) });
   S.settings = settings;
   closeEditPanel();
-  loadPeople();
+  await loadPeople(true);
 }
 
-async function openSettings() { await openAddPanel(); } // compat alias
+async function openSettings() { await openAddPanel(); }
+
+// Close ep-results when clicking outside
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('#ep-search') && !ev.target.closest('#ep-results')) {
+    document.getElementById('ep-results')?.classList.add('hidden');
+  }
+});
 
 // ════════════════════════════════════════
 // DASHBOARD
 // ════════════════════════════════════════
-async function loadPeople() {
+async function loadPeople(bustCache = false) {
   document.getElementById('refreshBtn').classList.add('loading');
   try {
-    const r = await fetch('/api/people');
+    const url = bustCache ? '/api/people?bust=1' : '/api/people';
+    const r = await fetch(url);
     const d = await r.json();
     if (d.error) { showError(d.error); return; }
     S.allPeople = d.people || [];

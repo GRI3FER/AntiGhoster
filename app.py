@@ -115,15 +115,23 @@ def parse_chat_simple(chat, is_group=False):
         avatar = avatar or other[0].get("imgURL") or other[0].get("avatar")
         handle = other[0].get("username") or other[0].get("handle") or other[0].get("phoneNumber")
 
-    # Only count timestamp if YOU sent the last message
-    i_sent     = preview.get("isSender", False)
-    raw_ts     = preview.get("timestamp") if i_sent else None
-    ts         = parse_timestamp(raw_ts)
-    now        = datetime.now(tz=timezone.utc)
+    # Determine when YOU last texted in this chat.
+    # If your message is the preview (isSender=true), use that timestamp directly.
+    # If they replied after you, we don't have your exact sent time from the chat list API,
+    # so we use lastActivity as a conservative proxy — it's recent enough to be useful.
+    i_sent  = preview.get("isSender", False)
+    now     = datetime.now(tz=timezone.utc)
+    if i_sent:
+        ts = parse_timestamp(preview.get("timestamp"))
+    else:
+        # They replied — lastActivity reflects the whole conversation.
+        # Use it as upper bound; we know you texted *at some point* in this chat.
+        ts = parse_timestamp(chat.get("lastActivity"))
+
     days_since = (now - ts).days if ts else None
 
     # Also grab the last activity for display reference
-    last_activity_ts = parse_timestamp(chat.get("lastActivity"))
+    last_activity_ts   = parse_timestamp(chat.get("lastActivity"))
     last_activity_days = (now - last_activity_ts).days if last_activity_ts else None
 
     preview_text = preview.get("text") or ""
@@ -188,8 +196,9 @@ def api_contacts_raw():
 
 @app.route("/api/people")
 def api_people():
-    """Return only the configured people with their aggregated last-contact info."""
     try:
+        if request.args.get("bust"):
+            _chat_cache["data"] = None  # force re-fetch
         settings       = load_settings()
         people_cfg     = settings.get("people", [])
         expanded_ids   = set(settings.get("expanded_groups", []))
@@ -216,17 +225,20 @@ def api_people():
                 })
                 continue
 
-            # days_since = days since YOU last texted across all linked chats
-            # waiting_on_you = they texted last but you haven't replied
-            sent_chats  = [c for c in chats if c.get("i_sent_last") and c["days_since"] is not None]
-            freshest    = min(sent_chats, key=lambda c: c["days_since"]) if sent_chats else None
-            days_since  = freshest["days_since"] if freshest else None
+            # days_since = days since YOU last texted across all linked chats.
+            # parse_chat_simple sets days_since from your sent timestamp if i_sent_last,
+            # or lastActivity as fallback when they replied after you.
+            # Take the minimum (most recent) across all linked chats.
+            chats_with_ts = [c for c in chats if c["days_since"] is not None]
+            freshest      = min(chats_with_ts, key=lambda c: c["days_since"]) if chats_with_ts else None
+            days_since    = freshest["days_since"] if freshest else None
 
-            # Check if any chat has recent activity but you haven't replied
-            waiting_on_you = (days_since is None and
-                              any(c.get("last_activity_days") is not None and
-                                  (c.get("last_activity_days") or 999) < 30
-                                  for c in chats))
+            # waiting_on_you: they texted last in the most recent chat
+            waiting_on_you = (
+                freshest is not None and
+                not freshest.get("i_sent_last") and
+                (freshest.get("last_activity_days") or 999) < 30
+            )
 
             networks = list(dict.fromkeys(c["network"] for c in chats))
             # Avatar priority: Instagram > WhatsApp > any other
@@ -347,6 +359,7 @@ def api_avatar():
     return "", 404
 
 
+@app.route("/api/status")
 def api_status():
     try:
         beeper_get("/v1/accounts")
