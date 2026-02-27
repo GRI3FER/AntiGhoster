@@ -55,4 +55,4 @@ Also pull the pfp's from Instagram or WhatsApp (always prioritize Instagram over
 
 I primarily worked on the CSS, I first worked with the flexbox containers to center the items in the Header and status as well as realign the Status Pill so that it was in a new row, by using flex-direction: column.
 I then resized the text in a couple of places to better fit my vision. I also rewrote some of the text to feel more specific to me, rather than being generic like Claude had initially made it. I also did minor CSS changes
-here and there, like changing the color scheme.
+here and there, like changing the color scheme and having the boxes highlight match how long it's been since I talked to them.
