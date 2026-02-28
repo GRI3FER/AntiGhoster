@@ -53,6 +53,8 @@ Also pull the pfp's from Instagram or WhatsApp (always prioritize Instagram over
 
 **CODE I WROTE MYSELF**
 
-I primarily worked on the CSS, I first worked with the flexbox containers to center the items in the Header and status as well as realign the Status Pill so that it was in a new row, by using flex-direction: column.
+I created a Desktop notification so whenever someone is overdue, I automatically get a Desktop notification that I've been ghosting that person, which means I can just keep the tab running in the background and automatically get Desktop notifications when I'm ghosting someone instead of having to actively check the tab constantly.
+
+I also worked on the CSS, I first worked with the flexbox containers to center the items in the Header and status as well as realign the Status Pill so that it was in a new row, by using flex-direction: column.
 I then resized the text in a couple of places to better fit my vision. I also rewrote some of the text to feel more specific to me, rather than being generic like Claude had initially made it. I also did minor CSS changes
 here and there, like changing the color scheme and having the boxes highlight match how long it's been since I talked to them.
