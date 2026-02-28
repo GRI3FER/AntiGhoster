@@ -8,6 +8,7 @@ const S = {
   rawGroups: [],
   people: [],
   allPeople: [],
+  overdueCache: {}
 };
 
 // ════════════════════════════════════════
@@ -82,6 +83,24 @@ async function loadRaw() {
     S.rawGroups   = d.groups   || [];
     if (S.step === 1) renderPeopleList();
   } catch {}
+}
+
+//Notification helper
+function checkOverdueNotifications() {
+  if (Notification.permission !== "granted") return;
+
+  S.allPeople.forEach(p => {
+    const isOverdue = p.days_since !== null && p.days_since >= 14;
+    const wasOverdue = S.overdueCache[p.id];
+
+    if (isOverdue && !wasOverdue) {
+      new Notification(`${p.display_name} is now being ghosted`, {
+        body: `Time to lock in and message ${p.display_name}`,
+      }); 
+    }
+
+    S.overdueCache[p.id] = isOverdue;
+  });
 }
 
 // ════════════════════════════════════════
@@ -537,6 +556,9 @@ async function loadPeople(bustCache = false) {
     const d = await r.json();
     if (d.error) { showError(d.error); return; }
     S.allPeople = d.people || [];
+
+    checkOverdueNotifications();
+
     updateStats();
     render();
     document.getElementById('statsBar').style.display = 'flex';
